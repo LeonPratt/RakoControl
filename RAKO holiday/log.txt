@@ -1,0 +1,5 @@
+
+room=23 Spa_Bathroom channel=0 command=49 value = 3
+room=23 Spa_Bathroom channel=0 command=49 value = 1
+room=23 Spa_Bathroom channel=0 command=49 value = 4
+room=23 Spa_Bathroom channel=0 command=49 value = 0
