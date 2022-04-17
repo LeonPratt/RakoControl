@@ -102,9 +102,8 @@ def schedule_lights(lst):
         t = TIME.split("+")[0]
         DateTime = datetime.datetime.strptime(t, "%H:%M:%S")
         delay = (DateTime-currentdatetime).total_seconds()
-        print(delay)
 
-        #s.enter(delay,1,set_scene, argument= (event))
+        s.enter(delay,1,set_scene, argument= (event))
 
 
 def strip_earlier(lst):
