@@ -1,38 +1,59 @@
-import datetime
+from asyncio.windows_events import NULL
 import sched
-import time
 import socket
-import logging
+import random
+import http.client
+import datetime
+import ephem
+import time
+import pdpyras
+import schedule
+import traceback
+import sys
 import os
 from os import walk
-
-from numpy import full
-
 from threading import Thread
-#enter the names of the log files
-lognames = ["rako-2022-03-31.log","rako-2022-04-31.log"]
 
+TIME = ""
+t=datetime.datetime.now(datetime.timezone.utc)
+T=t.astimezone().isoformat(timespec='seconds')
+ 
+     
+current = str(T).split("T")[1]
+current = current.split("+")[0]
+
+t = datetime.datetime.strptime(current, "%H:%M:%S")
+TIME = str(t).split(" ")[1]
+        
 def Current_Time():
-
-    global current_time
+    
+    global t
+    global TIME
     while True:
         t=datetime.datetime.now(datetime.timezone.utc)
         T=t.astimezone().isoformat(timespec='seconds')
-        current_time = T.split("T")[1]
+ 
+     
+        current = str(T).split("T")[1]
+        current = current.split("+")[0]
+
+        t = datetime.datetime.strptime(current, "%H:%M:%S")
+        TIME = str(t).split(" ")[1]
+        
         time.sleep(1)
 
 thread = Thread(target=Current_Time)
 thread.start()
 
+
 def set_scene(dta):
-
-    room = int(dta[2])
-    channel = int(dta[3])
-    scene =int(dta[4])
-
+    
+    room = dta[0]
+    channel = dta[1]
+    scene = dta[2]
 
     BRIDGE_IP = "192.168.1.34"
-    PORT = "9761"
+    PORT = 9761
     data = bytearray.fromhex('000000000000000000')
 
     data[0] = 0x52
@@ -56,108 +77,76 @@ def set_scene(dta):
     soc.send(data)
     soc.close()
 
-#def playback(full_log):
-#
-#    info = []
-#
-#
-#    for x in range(len(full_log)):
-#        current_time = ""
-#        date = full_log[x].split(" ")[0]
-#        tod = date.split("T")[1] 
-# 
-#        splt = full_log[x].split(" ")
-#        room = splt[5].split("=")[1]
-#        channel = splt[7].split("=")[1]
-#        scene = splt[8].split("=")[1]
-#        event = splt[1]            
-#        dta = (tod, event,room,channel,scene)
-#        info.append(dta)            
-#        continue
-#    
-#    yield info
+def match_time(dta):
 
-
-def breakup_log(log):
-    
-    date = log.split(" ")[0]
-    tod = date.split("T")[1] 
+    ct = str(schedtime).split(":")
+    cs = int(ct[2]) + 1
+    a = ct[0] + ":" + ct[1] + ":" + str(cs)
+    while schedtime != t and a != t:
+        print(schedtime," ", a," ", t)
+        time.sleep(1)
  
-    splt = log.split(" ")
-    room = splt[5].split("=")[1]
-    channel = splt[7].split("=")[1]
-    scene = splt[8].split("=")[1]
-    event = splt[1]            
-    dta = (tod, event,room,channel,scene)
-           
-    yield dta
-
-
-def schedule_lights(lst):
-    c = current_time.split("+")[0]
-    currentdatetime = datetime.datetime.strptime(c, "%H:%M:%S")
-    s = sched.scheduler(time.time,time.sleep)
-    for event in lst:
-        TIME = event[0]
-        t = TIME.split("+")[0]
-        DateTime = datetime.datetime.strptime(t, "%H:%M:%S")
-        delay = (DateTime-currentdatetime).total_seconds()
-
-        s.enter(delay,1,set_scene, argument= (event))
-
-
-def strip_earlier(lst):
     
-    for x in range(len(lst)):
-        if lst[0][0] < current_time:
-            lst.pop(0)
-        elif lst[0][0] > current_time:
-            break
-
-    yield lst
+    set_scene(dta)
 
 
-def readlogs():
-
-    logs = []
-
-    path = r"\rako_record"
-    dir_path= os.path.dirname(os.path.realpath(__name__)) + path
-
-    filenames = next(walk(dir_path))[2]
-    lognames = []
-    for x in range(len(filenames)):
-        if ".log" in filenames[x]:
-            lognames.append(filenames[x])
-    lognames.sort()
-
-
-   
-    global full_log
-    full_log = []
-
-    for x in range(len(lognames)):
-        fn = "rako_record\\"+ lognames[x]
-
-        f = open(fn, "r")
-        file = f.readlines()
-        for y in range(len(file)):
-
-            if " I " in file[y]:
-                full_log.append(file[y].strip("\n"))
-
-
-    for x in range(len(full_log)):
-        inf = breakup_log(full_log[x])
-        logs.append(next(inf))
-    inf = strip_earlier(logs)
-    logs = next(inf)
-
-    schedule_lights(logs)
-
-
-while True:    
-    readlogs()
-    time.sleep(10)
-
+     
+    #print(len(combined_logfile))
+def schedule_lights(LOG):
+    for x in LOG:
+        splt_cmd = x.split(" ")
+        date = splt_cmd[0]
+        tod = date.split("T")[1]
+        room = splt_cmd[5].split("=")[1]
+        channel = splt_cmd[7].split("=")[1]
+        scene = splt_cmd[8].split("=")[1]
         
+        t = tod.split("+")[0]
+        
+        global schedtime
+        schedtime = datetime.datetime.strptime(t,"%H:%M:%S")
+        #match_time(room,channel,scene)
+        #print(schedtime, current_time)
+        #delay = (schedtime-t).total_seconds()
+        #s = sched.scheduler(time.time,time.sleep)
+        dta = (int(room),int(channel),int(scene))
+        print(dta)
+        match_time(dta)
+        
+        
+        #s.enter(delay,1,set_scene, argument= (dta))
+        #print("scheduled %s for %s (%f seconds)" % (dta, str(schedtime), float(delay)))
+        #match_time(room,channel,scene)
+        #print(delay)
+
+
+
+while True:
+    dir_path= os.path.dirname(os.path.realpath(__name__))
+
+    files = next(walk(dir_path))[2]
+
+
+    combined_logfile = []
+    for x in files:
+        if ".log" in x:
+            f  = open(x,"r")
+            file = f.read().split("\n")
+            for y in file:
+                if " I " in y:
+                    combined_logfile.append(y)
+
+    def strip_earlier(lst):
+
+        for x in range(len(lst)):
+                
+            tod = lst[0].split(" ")[0].split("T")[1].split("+")[0]
+                #print(tod, TIME, len(TIME))
+            if tod < TIME:
+                
+                lst.pop(0)
+            else:
+                break
+        return lst
+    LOG = strip_earlier(combined_logfile)
+    schedule_lights(LOG)
